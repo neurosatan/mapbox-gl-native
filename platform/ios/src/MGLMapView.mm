@@ -528,7 +528,7 @@ public:
 
     _hapticFeedbackEnabled = YES;
     
-    _altitudeUnaffectedByPitch = NO;
+    _cameraAltitudeAffectedByPitch = YES;
 
     _decelerationRate = MGLMapViewDecelerationRateNormal;
 
@@ -2300,7 +2300,7 @@ public:
     auto camera = _mbglMap->getStyle().getDefaultCamera();
     CGFloat pitch = *camera.pitch;
     CLLocationDirection heading = mbgl::util::wrap(*camera.angle, 0., 360.);
-    CLLocationDegrees pitchForAltitude = self.altitudeUnaffectedByPitch ? 0.0 : pitch;
+    CLLocationDegrees pitchForAltitude = self.isCameraAltitudeAffectedByPitch ? pitch : 0.0;
     CLLocationDistance distance = MGLAltitudeForZoomLevel(*camera.zoom, pitchForAltitude, 0, self.frame.size);
     self.camera = [MGLMapCamera cameraLookingAtCenterCoordinate:MGLLocationCoordinate2DFromLatLng(*camera.center)
                                                    fromDistance:distance
@@ -3206,6 +3206,11 @@ public:
     [self setCamera:camera animated:NO];
 }
 
+- (void)setCamera:(MGLMapCamera *)camera edgePadding:(UIEdgeInsets)edgePadding
+{
+    [self setCamera:camera withDuration:0 animationTimingFunction:nil edgePadding:edgePadding completionHandler:nil];
+}
+
 - (void)setCamera:(MGLMapCamera *)camera animated:(BOOL)animated
 {
     [self setCamera:camera withDuration:animated ? MGLAnimationDuration : 0 animationTimingFunction:nil];
@@ -3323,12 +3328,6 @@ public:
     self.cameraChangeReasonBitmask &= ~MGLCameraChangeReasonTransitionCancelled;
 }
 
-- (void)jumpToCamera:(MGLMapCamera *)camera edgePadding:(UIEdgeInsets)insets
-{
-    mbgl::CameraOptions options = [self cameraOptionsObjectForAnimatingToCamera:camera edgePadding:insets];
-    _mbglMap->jumpTo(options);
-}
-
 - (MGLMapCamera *)cameraThatFitsCoordinateBounds:(MGLCoordinateBounds)bounds
 {
     return [self cameraThatFitsCoordinateBounds:bounds edgePadding:UIEdgeInsetsZero];
@@ -3383,7 +3382,7 @@ public:
     double zoomLevel = cameraOptions.zoom ? *cameraOptions.zoom : self.zoomLevel;
     CLLocationDirection direction = cameraOptions.angle ? mbgl::util::wrap(-MGLDegreesFromRadians(*cameraOptions.angle), 0., 360.) : self.direction;
     CGFloat pitch = cameraOptions.pitch ? MGLDegreesFromRadians(*cameraOptions.pitch) : _mbglMap->getPitch();
-    CLLocationDegrees pitchForAltitude = self.altitudeUnaffectedByPitch ? 0.0 : pitch;
+    CLLocationDegrees pitchForAltitude = self.isCameraAltitudeAffectedByPitch ? pitch : 0.0;
     CLLocationDistance altitude = MGLAltitudeForZoomLevel(zoomLevel, pitchForAltitude, centerCoordinate.latitude, self.frame.size);
     return [MGLMapCamera cameraLookingAtCenterCoordinate:centerCoordinate fromDistance:altitude pitch:pitch heading:direction];
 }
@@ -3398,7 +3397,7 @@ public:
         options.center = MGLLatLngFromLocationCoordinate2D(camera.centerCoordinate);
     }
     options.padding = MGLEdgeInsetsFromNSEdgeInsets(insets);
-    CLLocationDegrees pitch = (self.altitudeUnaffectedByPitch) ? 0.0 : camera.pitch;
+    CLLocationDegrees pitch = (self.isCameraAltitudeAffectedByPitch) ? camera.pitch : 0.0;
     options.zoom = MGLZoomLevelForAltitude(camera.altitude, pitch,
                                            camera.centerCoordinate.latitude,
                                            self.frame.size);
@@ -5105,7 +5104,7 @@ public:
     MGLMapCamera *camera = self.camera;
     camera.centerCoordinate = self.userLocation.location.coordinate;
     camera.heading = self.directionByFollowingWithCourse;
-    CLLocationDegrees pitch = (self.altitudeUnaffectedByPitch) ? 0.0 : camera.pitch;
+    CLLocationDegrees pitch = (self.isCameraAltitudeAffectedByPitch) ? camera.pitch : 0.0;
     if (self.zoomLevel < MGLMinimumZoomLevelForUserTracking)
     {
         camera.altitude = MGLAltitudeForZoomLevel(MGLDefaultZoomLevelForUserTracking,
