@@ -533,7 +533,7 @@ MGL_EXPORT IB_DESIGNABLE
  map camera without the built-in side effect that pitch influences altitude. This will make the
  results of using outside animation more predictable and easier to control.
  
- The default value of this property is YES.
+ The default value of this property is `YES`.
  */
 @property(nonatomic, getter=isCameraAltitudeAffectedByPitch) BOOL cameraAltitudeAffectedByPitch;
 
