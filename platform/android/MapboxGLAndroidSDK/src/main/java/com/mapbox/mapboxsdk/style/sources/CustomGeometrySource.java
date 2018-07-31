@@ -15,18 +15,23 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Custom Vector Source, allows using FeatureCollections.
- *
  */
 @UiThread
 public class CustomGeometrySource extends Source {
+  public static final String THREAD_PREFIX = "CustomGeom";
+  public static final int THREAD_POOL_LIMIT = 4;
+  private static final AtomicInteger poolCount = new AtomicInteger();
   private ExecutorService executor;
   private GeometryTileProvider provider;
   private final Map<TileID, AtomicBoolean> cancelledTileRequests = new ConcurrentHashMap<>();
@@ -34,7 +39,7 @@ public class CustomGeometrySource extends Source {
   /**
    * Create a CustomGeometrySource
    *
-   * @param id The source id.
+   * @param id       The source id.
    * @param provider The tile provider that returns geometry data for this source.
    */
   public CustomGeometrySource(String id, GeometryTileProvider provider) {
@@ -45,21 +50,31 @@ public class CustomGeometrySource extends Source {
    * Create a CustomGeometrySource with non-default CustomGeometrySourceOptions.
    * <p>Supported options are minZoom, maxZoom, buffer, and tolerance.</p>
    *
-   * @param id      The source id.
+   * @param id       The source id.
    * @param provider The tile provider that returns geometry data for this source.
-   * @param options CustomGeometrySourceOptions.
+   * @param options  CustomGeometrySourceOptions.
    */
   public CustomGeometrySource(String id, GeometryTileProvider provider, CustomGeometrySourceOptions options) {
     super();
     this.provider = provider;
-    executor = Executors.newFixedThreadPool(4);
+    executor = Executors.newFixedThreadPool(THREAD_POOL_LIMIT, new ThreadFactory() {
+      final AtomicInteger threadCount = new AtomicInteger();
+      final int poolId = poolCount.getAndIncrement();
+
+      @Override
+      public Thread newThread(@NonNull Runnable runnable) {
+        return new Thread(
+          runnable,
+          String.format(Locale.US, "%s-%d-%d", THREAD_PREFIX, poolId, threadCount.getAndIncrement()));
+      }
+    });
     initialize(id, options);
   }
 
   /**
-   *  Invalidate previously provided features within a given bounds at all zoom levels.
-   *  Invoking this method will result in new requests to `GeometryTileProvider` for regions
-   *  that contain, include, or intersect with the provided bounds.
+   * Invalidate previously provided features within a given bounds at all zoom levels.
+   * Invoking this method will result in new requests to `GeometryTileProvider` for regions
+   * that contain, include, or intersect with the provided bounds.
    *
    * @param bounds The region in which features should be invalidated at all zoom levels
    */
@@ -73,8 +88,8 @@ public class CustomGeometrySource extends Source {
    * in new requests to `GeometryTileProvider` for visible tiles.
    *
    * @param zoomLevel Tile zoom level.
-   * @param x Tile X coordinate.
-   * @param y Tile Y coordinate.
+   * @param x         Tile X coordinate.
+   * @param y         Tile Y coordinate.
    */
   public void invalidateTile(int zoomLevel, int x, int y) {
     checkThread();
@@ -87,9 +102,9 @@ public class CustomGeometrySource extends Source {
    * background threads.
    *
    * @param zoomLevel Tile zoom level.
-   * @param x Tile X coordinate.
-   * @param y Tile Y coordinate.
-   * @param data Feature collection for the tile.
+   * @param x         Tile X coordinate.
+   * @param y         Tile Y coordinate.
+   * @param data      Feature collection for the tile.
    */
   public void setTileData(int zoomLevel, int x, int y, FeatureCollection data) {
     checkThread();
@@ -152,6 +167,11 @@ public class CustomGeometrySource extends Source {
     }
   }
 
+  @Keep
+  private void releaseThreads() {
+    executor.shutdownNow();
+  }
+
   private static class TileID {
     public int z;
     public int x;
@@ -164,7 +184,7 @@ public class CustomGeometrySource extends Source {
     }
 
     public int hashCode() {
-      return Arrays.hashCode(new int[]{z, x, y});
+      return Arrays.hashCode(new int[] {z, x, y});
     }
 
     public boolean equals(Object object) {
@@ -177,7 +197,7 @@ public class CustomGeometrySource extends Source {
       }
 
       if (object instanceof TileID) {
-        TileID other = (TileID)object;
+        TileID other = (TileID) object;
         return this.z == other.z && this.x == other.x && this.y == other.y;
       }
       return false;
@@ -205,7 +225,7 @@ public class CustomGeometrySource extends Source {
 
       FeatureCollection data = provider.getFeaturesForBounds(LatLngBounds.from(id.z, id.x, id.y), id.z);
       CustomGeometrySource source = sourceRef.get();
-      if (!isCancelled() && source != null && data != null)  {
+      if (!isCancelled() && source != null && data != null) {
         source.setTileData(id, data);
       }
     }

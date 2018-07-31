@@ -30,7 +30,7 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.lineColor;
  */
 public class GridSourceActivity extends AppCompatActivity implements OnMapReadyCallback {
 
-  private static final String ID_GRID_SOURCE = "grid_source";
+  public static final String ID_GRID_SOURCE = "grid_source";
   private static final String ID_GRID_LAYER = "grid_layer";
 
   private MapView mapView;

@@ -37,7 +37,7 @@ public:
 
     void addToMap(JNIEnv&, jni::Object<Source>, mbgl::Map&, AndroidRendererFrontend&);
 
-    void removeFromMap(JNIEnv&, jni::Object<Source>, mbgl::Map&);
+    virtual void removeFromMap(JNIEnv&, jni::Object<Source>, mbgl::Map&);
 
     jni::String getId(jni::JNIEnv&);
 
